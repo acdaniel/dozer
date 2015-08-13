@@ -1,0 +1,134 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var prettyjson = require('prettyjson');
+var fs = require('fs');
+var chalk = require('chalk');
+var server = require('../lib/server');
+var client = require('../lib/client')
+
+// Server Commands
+program
+  .command('server <config>')
+  .description('Start dozer server with the given config')
+  .action(function(configFile) {
+    var config = JSON.parse(fs.readFileSync(configFile));
+    server.start(config, function (err) {
+      if (err) { throw err; }
+    });
+    process.on('exit', function () {
+      server.stop();
+    });
+  });
+
+
+// Client Commands
+program
+  .command('get <uri>')
+  .alias('find')
+  .description('Send GET request to dozer server')
+  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-q, --query <query>', 'Query used to filter results')
+  .option('-f, --fields <fields>', 'Specify which fields to include/exclude in results')
+  .option('-l, --limit <limit>', 'Specify the limit for the number of documents returned')
+  .option('-s, --sort <sort>', 'Specify the sort order for the results')
+  .option('-i, --skip <skip>', 'Specify the number of documents to skip in the results')
+  .option('-c, --count', 'Return the count of documents found by the query')
+  .option('-o, --one', 'Return only one document when querying a collection')
+  .option('-j, --json', 'Display the results as JSON')
+  .action(function (uri, options) {
+    client.get(uri, options)
+      .then(function (obj) {
+        if (options.json) {
+          console.log('%j', obj);
+        } else {
+          console.log(prettyjson.render(obj));
+        }
+      })
+      .catch(function (err) {
+        return console.log(chalk.red('ERROR [%s]') + ' %s', err.statusCode, err.message);
+      });
+  });
+
+program
+  .command('post <uri>')
+  .alias('insert')
+  .description('Send POST request to dozer server')
+  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-d, --doc <doc>', 'Specify the document(s) to post')
+  .option('-f, --file <file>', 'Specify the local file to post as the document(s)')
+  .option('-e, --enc <enc>', 'Specify the encoding of the file to post')
+  .option('-j, --json', 'Display the results as JSON')
+  .action(function (uri, options) {
+    var body = undefined;
+    if (options.doc) {
+      body = JSON.parse(options.doc);
+    } else if (options.file) {
+      var enc = options.enc || 'utf8';
+      body = JSON.parse(fs.readFileSync(options.file, { encoding: enc }));
+    } else {
+      console.log(chalk.red('ERROR') + ' either options -d or -f are required');
+      return;
+    }
+    client.post(uri, body, options)
+      .then(function (obj) {
+        if (options.json) {
+          console.log('%j', obj);
+        } else {
+          console.log(prettyjson.render(obj));
+        }
+      })
+      .catch(function (err) {
+        return console.log(chalk.red('ERROR [%s]') + ' %s', err.statusCode, err.message);
+      });
+  });
+
+program
+  .command('put <uri>')
+  .alias('update')
+  .description('Send PUT request to dozer server')
+  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-q, --query <query>', 'Query used to filter results')
+  .option('-u, --update <update>', 'The update operations to be applied')
+  .option('-m, --multiple', 'Specify to update multiple documets')
+  .option('--upsert', 'Specify to insert documents if not found')
+  .option('-j, --json', 'Display the results as JSON')
+  .action(function (uri, options) {
+    var body = JSON.parse(options.update);
+    client.put(uri, body, options)
+      .then(function (obj) {
+        if (options.json) {
+          console.log('%j', obj);
+        } else {
+          console.log(prettyjson.render(obj));
+        }
+      })
+      .catch(function (err) {
+        return console.log(chalk.red('ERROR [%s]') + ' %s', err.statusCode, err.message);
+      });
+  });
+
+program
+  .command('delete <uri>')
+  .alias('del')
+  .description('Send DELETE request to dozer server')
+  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-q, --query <query>', 'Query used to filter results')
+  .option('-m, --multiple', 'Specify to update multiple documets')
+  .option('-j, --json', 'Display the results as JSON')
+  .action(function (uri, options) {
+    client.del(uri, options)
+      .then(function (obj) {
+        if (options.json) {
+          console.log('%j', obj);
+        } else {
+          console.log(prettyjson.render(obj));
+        }
+      })
+      .catch(function (err) {
+        return console.log(chalk.red('ERROR [%s]') + ' %s', err.statusCode, err.message);
+      });
+  });
+
+
+program.parse(process.argv);

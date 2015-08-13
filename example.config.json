@@ -1,0 +1,8 @@
+{
+  "db": {
+    "uri": "mongodb://localhost:27017/test"
+  },
+  "apiKeys": [
+    "change-this-to-something-better"
+  ]
+}
