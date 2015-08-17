@@ -23,7 +23,6 @@
     "commander": "^2.8.1",
     "convict": "^1.0.1",
     "debug": "^2.2.0",
-    "etag": "^1.7.0",
     "mongodb": "^2.0.40",
     "node-cache": "^3.0.0",
     "node-uuid": "^1.4.3",
