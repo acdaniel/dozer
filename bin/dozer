@@ -4,30 +4,95 @@ var program = require('commander');
 var prettyjson = require('prettyjson');
 var fs = require('fs');
 var chalk = require('chalk');
+var uuid = require('node-uuid');
+var crypto = require('crypto');
 var server = require('../lib/server');
-var client = require('../lib/client')
+var client = require('../lib/client');
 
 // Server Commands
 program
-  .command('server <config>')
+  .command('server [config]')
   .description('Start dozer server with the given config')
   .action(function(configFile) {
+    configFile = configFile || './dozer-conf.json';
     var config = JSON.parse(fs.readFileSync(configFile));
-    server.start(config, function (err) {
-      if (err) { throw err; }
-    });
+    server.start(config)
+      .catch(function (err) {
+        return console.log(chalk.red('ERROR') + ' %s', err.message);
+      });
     process.on('exit', function () {
       server.stop();
     });
   });
 
+program
+  .command('keys [config]')
+  .description('Returns list of current api keys')
+  .action(function (configFile) {
+    configFile = configFile || './dozer-conf.json';
+    var config = JSON.parse(fs.readFileSync(configFile));
+    config.auth.apiKeys = config.auth.apiKeys || {};
+    for (var k in config.auth.apiKeys) {
+      console.log(chalk.green('-'));
+      console.log(chalk.green('API KEY:') + '  %s', k);
+      console.log(chalk.green('SECRET: ') + '  %s', config.auth.apiKeys[k]);
+    }
+  });
+
+program
+  .command('gen_key [config]')
+  .description('Generates and saves a new api key')
+  .option('-j, --json', 'Display the results as JSON')
+  .action(function (configFile, options) {
+    configFile = configFile || './dozer-conf.json';
+    var config = JSON.parse(fs.readFileSync(configFile));
+    var key = uuid.v1();
+    var secret = crypto.createHmac('sha256', key).update(uuid.v1()).digest('hex');
+    config.auth.apiKeys = config.auth.apiKeys || {};
+    config.auth.apiKeys[key] = secret;
+    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+    console.log(chalk.green('API KEY:') + '  %s', key);
+    console.log(chalk.green('SECRET: ') + '  %s', secret);
+  });
+
+  program
+    .command('regen_secret <key> [config]')
+    .description('Generates a new secret for the given api key')
+    .option('-j, --json', 'Display the results as JSON')
+    .action(function (key, configFile, options) {
+      configFile = configFile || './dozer-conf.json';
+      var config = JSON.parse(fs.readFileSync(configFile));
+      if (!config.auth.apiKeys || !config.auth.apiKeys[key]) {
+        return console.log(chalk.red('ERROR') + ' API key not found');
+      }
+      var secret = crypto.createHmac('sha256', key).update(uuid.v1()).digest('hex');
+      config.auth.apiKeys[key] = secret;
+      fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+      console.log(chalk.green('API KEY:') + '  %s', key);
+      console.log(chalk.green('SECRET: ') + '  %s', secret);
+    });
+
+  program
+    .command('del_key <key> [config]')
+    .description('Removes the given api key')
+    .option('-j, --json', 'Display the results as JSON')
+    .action(function (key, configFile, options) {
+      configFile = configFile || './dozer-conf.json';
+      var config = JSON.parse(fs.readFileSync(configFile));
+      if (!config.auth.apiKeys || !config.auth.apiKeys[key]) {
+        return console.log(chalk.red('ERROR') + ' API key not found');
+      }
+      delete config.auth.apiKeys[key];
+      fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+      console.log(chalk.green('SUCCESS'));
+    });
 
 // Client Commands
 program
   .command('get <uri>')
   .alias('find')
   .description('Send GET request to dozer server')
-  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-a, --auth <auth>', 'API key:secret for authenticating to the server')
   .option('-q, --query <query>', 'Query used to filter results')
   .option('-f, --fields <fields>', 'Specify which fields to include/exclude in results')
   .option('-l, --limit <limit>', 'Specify the limit for the number of documents returned')
@@ -54,7 +119,7 @@ program
   .command('post <uri>')
   .alias('insert')
   .description('Send POST request to dozer server')
-  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-a, --auth <auth>', 'API key:secret for authenticating to the server')
   .option('-d, --doc <doc>', 'Specify the document(s) to post')
   .option('-f, --file <file>', 'Specify the local file to post as the document(s)')
   .option('-e, --enc <enc>', 'Specify the encoding of the file to post')
@@ -87,7 +152,7 @@ program
   .command('put <uri>')
   .alias('update')
   .description('Send PUT request to dozer server')
-  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-a, --auth <auth>', 'API key:secret for authenticating to the server')
   .option('-q, --query <query>', 'Query used to filter results')
   .option('-u, --update <update>', 'The update operations to be applied')
   .option('-m, --multiple', 'Specify to update multiple documets')
@@ -112,7 +177,7 @@ program
   .command('delete <uri>')
   .alias('del')
   .description('Send DELETE request to dozer server')
-  .option('-k, --apiKey <apiKey>', 'API key for authenticating to the server')
+  .option('-a, --auth <auth>', 'API key:secret for authenticating to the server')
   .option('-q, --query <query>', 'Query used to filter results')
   .option('-m, --multiple', 'Specify to update multiple documets')
   .option('-j, --json', 'Display the results as JSON')
