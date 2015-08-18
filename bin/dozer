@@ -6,6 +6,7 @@ var fs = require('fs');
 var chalk = require('chalk');
 var uuid = require('node-uuid');
 var crypto = require('crypto');
+var debug = require('debug')('dozer:cli');
 var server = require('../lib/server');
 var client = require('../lib/client');
 
@@ -15,12 +16,15 @@ program
   .description('Start dozer server with the given config')
   .action(function(configFile) {
     configFile = configFile || './dozer-conf.json';
+    debug('loading config file %s', configFile);
     var config = JSON.parse(fs.readFileSync(configFile));
+    debug('starting server');
     server.start(config)
       .catch(function (err) {
         return console.log(chalk.red('ERROR') + ' %s', err.message);
       });
     process.on('exit', function () {
+      debug('stopping server');
       server.stop();
     });
   });
@@ -30,8 +34,10 @@ program
   .description('Returns list of current api keys')
   .action(function (configFile) {
     configFile = configFile || './dozer-conf.json';
+    debug('loading config file %s', configFile);
     var config = JSON.parse(fs.readFileSync(configFile));
     config.auth.apiKeys = config.auth.apiKeys || {};
+    debug('displaying api keys');
     for (var k in config.auth.apiKeys) {
       console.log(chalk.green('-'));
       console.log(chalk.green('API KEY:') + '  %s', k);
@@ -45,12 +51,16 @@ program
   .option('-j, --json', 'Display the results as JSON')
   .action(function (configFile, options) {
     configFile = configFile || './dozer-conf.json';
+    debug('loading config file %s', configFile);
     var config = JSON.parse(fs.readFileSync(configFile));
+    debug('generating new key and secret');
     var key = uuid.v1();
     var secret = crypto.createHmac('sha256', key).update(uuid.v1()).digest('hex');
     config.auth.apiKeys = config.auth.apiKeys || {};
     config.auth.apiKeys[key] = secret;
+    debug('writing changes to config file');
     fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+    debug('displaying results');
     console.log(chalk.green('API KEY:') + '  %s', key);
     console.log(chalk.green('SECRET: ') + '  %s', secret);
   });
@@ -61,13 +71,17 @@ program
     .option('-j, --json', 'Display the results as JSON')
     .action(function (key, configFile, options) {
       configFile = configFile || './dozer-conf.json';
+      debug('loading config file %s', configFile);
       var config = JSON.parse(fs.readFileSync(configFile));
       if (!config.auth.apiKeys || !config.auth.apiKeys[key]) {
         return console.log(chalk.red('ERROR') + ' API key not found');
       }
+      debug('generating new secret for key %s', key);
       var secret = crypto.createHmac('sha256', key).update(uuid.v1()).digest('hex');
       config.auth.apiKeys[key] = secret;
+      debug('writing changes to config file');
       fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+      debug('displaying results');
       console.log(chalk.green('API KEY:') + '  %s', key);
       console.log(chalk.green('SECRET: ') + '  %s', secret);
     });
@@ -78,12 +92,16 @@ program
     .option('-j, --json', 'Display the results as JSON')
     .action(function (key, configFile, options) {
       configFile = configFile || './dozer-conf.json';
+      debug('loading config file %s', configFile);
       var config = JSON.parse(fs.readFileSync(configFile));
       if (!config.auth.apiKeys || !config.auth.apiKeys[key]) {
         return console.log(chalk.red('ERROR') + ' API key not found');
       }
+      debug('deleting key %s', key);
       delete config.auth.apiKeys[key];
+      debug('writing changes to config file');
       fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+      debug('displaying results');
       console.log(chalk.green('SUCCESS'));
     });
 
