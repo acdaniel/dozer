@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var fs = require('fs');
+var chalk = require('chalk');
+var debug = require('debug')('dozer:cli');
+var server = require('../lib/server');
+var config = require('../lib/config');
+
+program
+  .command('start [config]')
+  .description('Start a dozer server')
+  .option('-d, --db <uri>', 'URI to the MongoDB database')
+  .option('-H, --host <host>', 'Host name for the dozer server')
+  .option('-p, --port <port>', 'Port number for the dozer server')
+  .option('-c, --cert <cert>', 'Path to the PEM encoded cert')
+  .option('-k, --key <key>', 'Path to the PEM encoded key')
+  .option('-a, --auth <secret>', 'Enable authentication with the given secret')
+  .action(function(configFile, program) {
+    if (configFile) {
+      config.loadFile(configFile);
+    }
+    if (program.db) {  config.set('db.uri', program.db); }
+    if (program.host) {  config.set('server.host', program.host); }
+    if (program.port) {  config.set('server.port', program.port); }
+    if (program.cert) {  config.set('server.cert', program.cert); }
+    if (program.key) {  config.set('server.key', program.key); }
+    if (program.auth) {
+      config.set('auth.enabled', true);
+      config.set('auth.secret', program.auth);
+    }
+    config.validate({strict: true});
+    debug('starting server');
+    server.start()
+      .catch(function (err) {
+        return console.log(chalk.red('ERROR') + ' %s', err.message);
+      });
+    process.on('exit', function () {
+      debug('stopping server');
+      server.stop();
+    });
+  });
+
+program.parse(process.argv);
