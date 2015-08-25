@@ -1,0 +1,142 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var prettyjson = require('prettyjson');
+var fs = require('fs');
+var chalk = require('chalk');
+var uuid = require('node-uuid');
+var crypto = require('crypto');
+var debug = require('debug')('dozer:cli');
+var jwt = require('jsonwebtoken');
+var inquirer = require('inquirer');
+var config = require('../lib/config');
+
+program
+  .command('create [config]')
+  .description('Creates a new token used to access the API')
+  .option('-s, --sub <sub>', 'The subject of the token')
+  .option('-a, --aud <aud>', 'The intended audience of the token')
+  .option('-e, --exp <exp>', 'The expiration number (secs since epoch)')
+  .option('-t, --ttl <ttl>', 'Time to live (in secs) from now before the token expires')
+  .option('-g, --grant <scope>', 'Scope granted in the format [collection].[method] (comma sep, wildcards allowed)')
+  .option('-S, --secret <secret>', 'Secret used to sign the token')
+  .option('-i, --iss <issuer>', 'Issuer of the token')
+  .option('-p, --prompt', 'Prompt for token claims')
+  .option('-o, --out <file>', 'Save the token to a file')
+  .action(function (configFile, program) {
+
+    function gen (payload) {
+      var token = jwt.sign(
+        payload,
+        config.get('auth.secret'),
+        { algorithm: config.get('auth.algorithm') }
+      );
+      if (program.out) {
+        fs.writeFileSync(program.out, token);
+      } else {
+        console.log(token);
+      }
+    }
+
+    if (configFile) {
+      config.loadFile(configFile);
+    }
+    if (program.secret) {
+      config.set('auth.secret', program.secret);
+    }
+    if (program.issuer) {
+      config.set('auth.issuer', program.issuer);
+    }
+    config.validate({strict: true});
+    var payload = {
+      iss: config.get('auth.issuer'),
+      jti: uuid.v1()
+    };
+    if (program.prompt) {
+      var questions = [
+        { type: 'input', name: 'sub', message: 'Subject:' },
+        { type: 'input', name: 'aud', message: 'Audience:' },
+        { type: 'input', name: 'ttl', message: 'TTL:', default: 60 * 24 * 365 },
+        { type: 'input', name: 'scope', message: 'Granted Scope:', default: '*.get' },
+        { type: 'input', name: 'issuer', message: 'Issuer:', when: !config.get('auth.issuer') },
+        { type: 'input', name: 'secret', message: 'Secret:', when: !config.get('auth.secret') }
+      ];
+      inquirer.prompt(questions, function(answers) {
+        if (answers.secret) { config.set('auth.secret', answers.secret); }
+        if (answers.issuer) { config.set('auth.issuer', answers.issuer); }
+        if (answers.sub) { payload.sub = answers.sub; }
+        if (answers.aud) { payload.aud = answers.aud; }
+        if (answers.ttl) { payload.exp = Math.floor(Date.now() / 1000) + parseInt(answers.ttl, 10); }
+        if (answers.scope) { payload.scope = answers.scope.split(/\s*,\s*/); }
+        gen(payload);
+      });
+    } else {
+      if (program.sub) { payload.sub = program.sub; }
+      if (program.aud) { payload.aud = program.aud; }
+      if (program.exp) {
+        payload.exp = program.exp;
+      } else if (program.ttl) {
+        payload.exp = Math.floor(Date.now() / 1000) + parseInt(program.ttl, 10);
+      }
+      if (program.grant) { payload.scope = program.grant.split(/\s*,\s*/); }
+      gen(payload);
+    }
+  });
+
+program
+  .command('verify [config]')
+  .description('Verifies that the given token is valid and displays token information')
+  .option('-t, --token <token>', 'The token to verify')
+  .option('-f, --file <file>', 'File containing the token to verify')
+  .option('-S, --secret <secret>', 'Secret used to sign the token')
+  .option('-i, --iss <issuer>', 'Issuer of the token')
+  .action(function (configFile, program) {
+    if (configFile) {
+      config.loadFile(configFile);
+    }
+    if (program.secret) {
+      config.set('auth.secret', program.secret);
+    }
+    if (program.issuer) {
+      config.set('auth.issuer', program.issuer);
+    }
+    config.validate({strict: true});
+    var token = program.token ? program.token :
+      program.file ? fs.readFileSync(program.file, 'UTF8') : process.env.DOZER_TOKEN;
+    try {
+      var decoded = jwt.verify(token, config.get('auth.secret'));
+      console.log(prettyjson.render(decoded));
+    } catch (err) {
+      console.log(chalk.red('ERROR') + ' %s', err.message);
+    }
+  });
+
+program
+  .command('decode [config]')
+  .description('Decodes the given token and displays token information')
+  .option('-t, --token <token>', 'The token to verify')
+  .option('-f, --file <file>', 'File containing the token to verify')
+  .option('-S, --secret <secret>', 'Secret used to sign the token')
+  .option('-i, --iss <issuer>', 'Issuer of the token')
+  .action(function (configFile, program) {
+    if (configFile) {
+      config.loadFile(configFile);
+    }
+    if (program.secret) {
+      config.set('auth.secret', program.secret);
+    }
+    if (program.issuer) {
+      config.set('auth.issuer', program.issuer);
+    }
+    config.validate({strict: true});
+    var token = program.token ? program.token :
+      program.file ? fs.readFileSync(program.file, 'UTF8') : process.env.DOZER_TOKEN;
+    try {
+      var decoded = jwt.decode(token, config.get('auth.secret'));
+      console.log(prettyjson.render(decoded));
+    } catch (err) {
+      console.log(chalk.red('[ERROR]') + ' %s', err.message);
+    }
+  });
+
+program.parse(process.argv);
