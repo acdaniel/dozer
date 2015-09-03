@@ -2,7 +2,7 @@
 
 var program = require('commander');
 var prettyjson = require('prettyjson');
-var assign = require('object-assign');
+var defaults = require('defaults');
 var fs = require('fs');
 var chalk = require('chalk');
 var debug = require('debug')('dozer:cli');
@@ -23,8 +23,7 @@ program
   .option('--json', 'Display the results as JSON')
   .option('--deflate', 'Should the results be deflated using MongoDB enhanced JSON')
   .action(function (uri, program) {
-    var options = assign(
-      { deflate: false },
+    var options = defaults(
       {
         token: program.token,
         query: program.query,
@@ -35,7 +34,8 @@ program
         count: program.count,
         one: program.one,
         deflate: program.deflate
-      }
+      },
+      { deflate: false }
     );
     client.get(uri, options)
       .then(function (obj) {
@@ -57,7 +57,7 @@ program
   .option('-t, --token <token>', 'Token for authenticating to the server')
   .option('-d, --doc <doc>', 'Specify the document(s) to post')
   .option('-f, --file <file>', 'Specify the local file to post as the document(s)')
-  .option('-e, --enc <enc>', 'Specify the encoding of the file to post')
+  .option('--enc <enc>', 'Specify the encoding of the file to post')
   .option('--json', 'Display the results as JSON')
   .option('--deflate', 'Should the results be deflated using MongoDB enhanced JSON')
   .action(function (uri, program) {
@@ -71,12 +71,12 @@ program
       console.log(chalk.red('ERROR') + ' either options -d or -f are required');
       return;
     }
-    var options = assign(
-      { deflate: false },
+    var options = defaults(
       {
         token: program.token,
         deflate: program.deflate
-      }
+      },
+      { deflate: false }
     );
     client.post(uri, body, options)
       .then(function (obj) {
@@ -103,15 +103,15 @@ program
   .option('--json', 'Display the results as JSON')
   .option('--deflate', 'Should the results be deflated using MongoDB enhanced JSON')
   .action(function (uri, program) {
-    var options = assign(
-      { deflate: false },
+    var options = defaults(
       {
         token: program.token,
         query: program.query,
         multiple: program.multiple,
         upsert: program.upsert,
         deflate: program.deflate
-      }
+      },
+      { deflate: false }
     );
     var body = program.update;
     client.put(uri, body, options)
@@ -137,14 +137,14 @@ program
   .option('--json', 'Display the results as JSON')
   .option('--deflate', 'Should the results be deflated using MongoDB enhanced JSON')
   .action(function (uri, program) {
-    var options = assign(
-      { deflate: false },
+    var options = defaults(
       {
         token: program.token,
         query: program.query,
         multiple: program.multiple,
         deflate: program.deflate
-      }
+      },
+      { deflate: false }
     );
     client.del(uri, options)
       .then(function (obj) {
@@ -159,5 +159,76 @@ program
       });
   });
 
+program
+  .command('aggregate <uri>')
+  .description('Send AGGREGATE request to dozer server')
+  .option('-t, --token <token>', 'Token for authenticating to the server')
+  .option('-p, --pipeline <pipeline>', 'Specify the aggregation pipeline')
+  .option('-e, --exp', 'Specify to return the processing information')
+  .option('-f, --file <file>', 'Specify the local file to post as the document(s)')
+  .option('--enc <enc>', 'Specify the encoding of the file to post')
+  .option('--json', 'Display the results as JSON')
+  .option('--deflate', 'Should the results be deflated using MongoDB enhanced JSON')
+  .action(function (uri, program) {
+    var body = undefined;
+    if (program.pipeline) {
+      body = program.pipeline;
+    } else if (program.file) {
+      var enc = program.enc || 'utf8';
+      body = fs.readFileSync(program.file, { encoding: enc });
+    } else {
+      console.log(chalk.red('ERROR') + ' either options -p or -f are required');
+      return;
+    }
+    var options = defaults(
+      {
+        token: program.token,
+        deflate: program.deflate,
+        explain: program.exp
+      },
+      { deflate: false }
+    );
+    client.aggregate(uri, body, options)
+      .then(function (obj) {
+        if (program.json) {
+          console.log('%j', obj);
+        } else {
+          console.log(prettyjson.render(obj));
+        }
+      })
+      .catch(function (err) {
+        return console.log(chalk.red('ERROR [%s]') + ' %s', err.statusCode, err.message);
+      });
+  });
+
+program
+  .command('distinct <uri>')
+  .description('Send DISTINCT request to dozer server')
+  .option('-t, --token <token>', 'Token for authenticating to the server')
+  .option('-q, --query <query>', 'Query used to filter results')
+  .option('-k, --key <key>', 'Specify the field containing the distinct value')
+  .option('--json', 'Display the results as JSON')
+  .option('--deflate', 'Should the results be deflated using MongoDB enhanced JSON')
+  .action(function (uri, program) {
+    var options = defaults(
+      {
+        token: program.token,
+        deflate: program.deflate
+      },
+      { deflate: false }
+    );
+    client.distinct(uri, program.key, program.query || {}, options)
+      .then(function (obj) {
+        if (program.json) {
+          console.log('%j', obj);
+        } else {
+          console.log(prettyjson.render(obj));
+        }
+      })
+      .catch(function (err) {
+        console.log(err.stack);
+        return console.log(chalk.red('ERROR [%s]') + ' %s', err.statusCode, err.message);
+      });
+  });
 
 program.parse(process.argv);
