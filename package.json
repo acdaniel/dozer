@@ -2,13 +2,23 @@
   "name": "dozer",
   "version": "2.0.1",
   "description": "Rest API interface for MongoDB (client and server)",
-  "bin": "bin/dozer",
+  "directories": {
+    "lib": "lib",
+    "bin": "bin"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "main": "lib/index.js",
-  "author": "Adam Daniel <adam@acdaniel.com>",
+  "author": {
+    "name": "Adam Daniel",
+    "email": "adam@acdaniel.com"
+  },
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/acdaniel/dozer"
+  },
   "keywords": [
     "mongo",
     "mongodb",
@@ -24,6 +34,8 @@
     "commander": "^2.8.1",
     "convict": "^1.0.1",
     "debug": "^2.2.0",
+    "defaults": "^1.0.2",
+    "defined": "^1.0.0",
     "inquirer": "^0.9.0",
     "jsonwebtoken": "^5.0.5",
     "minimatch": "^2.0.10",
