@@ -1,6 +1,6 @@
 {
   "name": "dozer",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "Rest API interface for MongoDB (client and server)",
   "directories": {
     "lib": "lib",
