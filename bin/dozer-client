@@ -6,7 +6,7 @@ var defaults = require('defaults');
 var fs = require('fs');
 var chalk = require('chalk');
 var debug = require('debug')('dozer:cli');
-var client = require('../lib/client');
+var client = require('dozer-client');
 
 program
   .command('get <uri>')

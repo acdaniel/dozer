@@ -36,6 +36,7 @@
     "debug": "^2.2.0",
     "defaults": "^1.0.2",
     "defined": "^1.0.0",
+    "dozer-client": "^1.0.0",
     "inquirer": "^0.9.0",
     "jsonwebtoken": "^5.0.5",
     "minimatch": "^2.0.10",
